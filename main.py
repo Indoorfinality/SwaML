@@ -5,7 +5,7 @@ from src.model_training import train_models
 
 def main():
     #Load dataset
-    df = load_dataset('data/Titanic.csv')
+    df = load_dataset('data/Iris.csv')
     print("Dataset loaded with shape: ", df.shape)
 
     #Detect target column
@@ -20,7 +20,7 @@ def main():
 
     best_model_name = train_models(X, y)
 
-    print("\n✅ AutoML pipeline finished successfully!")
+    print("\n SwaML pipeline finished successfully!")
     print("Best model selected:", best_model_name)
 
 if __name__ == "__main__":
