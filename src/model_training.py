@@ -4,23 +4,16 @@ from sklearn.metrics import accuracy_score, mean_squared_error
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
-
 def detect_problem_type(y):
     unique_values = y.nunique()
     if pd.api.types.is_numeric_dtype(y):
-        if unique_values <= 20:
-            return 'classification'
-        else:
-            return 'regression'
-    else:
-        return 'classification'
+        return 'regression' if unique_values > 20 else 'classification'
+    return 'classification'
 
 def train_models(X, y):
     problem_type = detect_problem_type(y)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-
-#2 models for each type
     if problem_type == 'classification':
         models = {
             'Random Forest': RandomForestClassifier(random_state=42),
@@ -28,34 +21,18 @@ def train_models(X, y):
         }
     else:
         models = {
-            'Random Forest Regressor': RandomForestRegressor(random_state=42),
+            'Random Forest': RandomForestRegressor(random_state=42),
             'Linear Regression': LinearRegression()
-        }    
-    
-    results = {}
+        }
 
+    results = {}
     for name, model in models.items():
         model.fit(X_train, y_train)
         predictions = model.predict(X_test)
-
-        if problem_type == 'classification':
-            score = accuracy_score(y_test, predictions)
-        else:
-            score = mean_squared_error(y_test, predictions)
-        
+        score = accuracy_score(y_test, predictions) if problem_type == 'classification' else mean_squared_error(y_test, predictions)
         results[name] = score
         print(f"{name} {problem_type} score: {score}")
 
-        #Pick best model
-
-        if problem_type == 'classification':
-            best_model = max(results, key=results.get)
-        else:
-            best_model = min(results, key=results.get)
-
+    best_model = max(results, key=results.get) if problem_type == 'classification' else min(results, key=results.get)
     print(f"Best model: {best_model} with score: {results[best_model]}")
     return best_model
-
-        
-
-

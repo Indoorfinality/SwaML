@@ -96,8 +96,7 @@ def suggest_target_llm(columns):
 
         prompt = f"""
 
-You are helping build an AutoML system.
-
+You are an expert Automatic Machine Learning system.
         Dataset columns:
         {', '.join(columns)}
 
@@ -139,12 +138,60 @@ def detect_target(df):
 
     return target
 
+# ---------------- Column drop detection ---------------- #
 
+def suggest_drops_llm(columns, target_column):
+    if not GOOGLE_API_KEY:
+        return []
+    try:
+        prompt = f"""
+    You are an expert Automatic Machine Learning system.
 
+    Columns: {', '.join(columns)}
+    Target: {target_column}
+    Task:
+    Suggest columns VERY LIKELY IRRELEVANT/NOISY for predicting target.
+    Examples: Unique IDs, names, high-missing (>70%), high-unique codes.
+
+    Output ONLY comma-separated list to drop, or 'NONE'.
+    No explanation.
+
+        """
+        response = llm.invoke(prompt)
+        suggestion = response.content.strip()
+        if suggestion.upper() == "NONE":
+            return []
+        drops = [col.strip() for col in suggestion.split(",") if col.strip()]
+        return drops
+    except Exception as e:
+        print(f"Gemini drop suggestion failed: {e}, using heuristic fallback.")
+        return []
+    
+def heuristic_columns_to_drop(df, target_column):
+        drops = set()
+        for col in df.columns:
+            if col == target_column:
+                continue
+            series = df[col]
+            if series.nunique() <=1 or series.isna().mean() >0.7 or is_id_column(series) or is_text_column(series):
+                drops.add(col)
+            elif series.dtype == 'object' and series.nunique() > 50:
+                drops.add(col)
+        return list(drops)
 
     
+def detect_columns_to_drop(df, target_column):
+    columns = list(df.columns)
+    llm_drops = suggest_drops_llm(columns, target_column)
+    if llm_drops:
+        invalid = [col for col in llm_drops if col not in columns or col == target_column]
+        if not invalid:
+            print (f"LLM suggested dropping columns: {llm_drops}")
+            return llm_drops
+        print (f"LLM suggested invalid columns to drop: {invalid}, using heuristic fallback.")
+        print ("Using heuristic to detect columns to drop.")
+        return heuristic_columns_to_drop(df, target_column)
 
-    
 
 
 
