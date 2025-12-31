@@ -191,11 +191,3 @@ def detect_columns_to_drop(df, target_column):
         print (f"LLM suggested invalid columns to drop: {invalid}, using heuristic fallback.")
         print ("Using heuristic to detect columns to drop.")
         return heuristic_columns_to_drop(df, target_column)
-
-
-
-
-
-    
-
-
