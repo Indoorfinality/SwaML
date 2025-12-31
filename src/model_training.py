@@ -29,9 +29,15 @@ def train_models(X, y):
     for name, model in models.items():
         model.fit(X_train, y_train)
         predictions = model.predict(X_test)
-        score = accuracy_score(y_test, predictions) if problem_type == 'classification' else mean_squared_error(y_test, predictions)
-        results[name] = score
-        print(f"{name} {problem_type} score: {score}")
+        if problem_type == 'classification':
+            score = accuracy_score(y_test, predictions)
+            score_percentage = score * 100  # Convert to percentage
+            results[name] = score  # Keep original for comparison
+            print(f"{name} {problem_type} score: {score_percentage:.2f}%")
+        else:
+            score = mean_squared_error(y_test, predictions)
+            results[name] = score
+            print(f"{name} {problem_type} score (MSE): {score:.4f}")
 
     best_model = max(results, key=results.get) if problem_type == 'classification' else min(results, key=results.get)
     print(f"Best model: {best_model} with score: {results[best_model]}")
