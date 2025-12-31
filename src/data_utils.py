@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
@@ -16,7 +17,9 @@ def preprocess_features(df, target_column):
         df = df.drop(columns=drops)
     else:
         print("No columns dropped.")
-    
+
+    df.columns = [col.strip().replace(' ', '_').replace('(', '').replace(')', '').replace('[', '').replace(']', '') for col in df.columns]
+
     X = df.drop(columns=[target_column])
     y = df[target_column]
     
@@ -50,8 +53,19 @@ def preprocess_features(df, target_column):
         ]
     )
     X_processed = preprocessor.fit_transform(X)
-    # Converting to DataFrame for easier use
-    X_processed = pd.DataFrame(X_processed, columns=preprocessor.get_feature_names_out())
+
+    #Get feature name safely
+
+    try:
+        feature_names = preprocessor.get_feature_names_out()
+    except ValueError:
+        #Fallback: use original column names
+        feature_names = X.columns
+
+    if isinstance(X_processed, np.ndarray):
+        X_processed = pd.DataFrame(X_processed, columns=feature_names, index=X.index)
+    else:
+        X_processed = pd.DataFrame(X_processed.toarray(), columns=feature_names, index=X.index)  # rare case
     return X_processed, y
 
 
