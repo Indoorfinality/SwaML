@@ -5,7 +5,7 @@ from src.model_training import train_models
 
 def main():
     #Load dataset
-    df = load_dataset('data/Iris.csv')
+    df = load_dataset('data/Titanic.csv')
     print("Dataset loaded with shape: ", df.shape)
 
     #Detect target column
