@@ -10,6 +10,28 @@ def load_dataset(path):
     return pd.read_csv(path)
 
 def preprocess_features(df, target_column):
+    df.columns = [
+        col.strip()                          
+           .replace(' ', '_')               
+           .replace('(', '')
+           .replace(')', '')
+           .replace('[', '')
+           .replace(']', '')
+           .replace(',', '_')
+        for col in df.columns
+    ]
+
+    # Also clean the target_column string to match
+    target_column = (
+        target_column.strip()
+        .replace(' ', '_')
+        .replace('(', '')
+        .replace(')', '')
+        .replace('[', '')
+        .replace(']', '')
+        .replace(',', '_')
+    )
+
     # Auto-drop irrelevant columns (LLM first, heuristics fallback)
     drops = detect_columns_to_drop(df, target_column)
     if drops:
