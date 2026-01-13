@@ -42,8 +42,28 @@ def preprocess_features(df, target_column):
 
     df.columns = [col.strip().replace(' ', '_').replace('(', '').replace(')', '').replace('[', '').replace(']', '') for col in df.columns]
 
+
+    #Auto Drop columns with >70% missing values
+    missing_pct = df.isna().mean() *100
+    high_missing_cols = missing_pct[(missing_pct >70) & (missing_pct.index != target_column)].index.tolist()
+    if high_missing_cols:
+        print(f"Dropping columns with >70% missing values: {high_missing_cols}")
+        df = df.drop(columns=high_missing_cols)
+
+    #Drop rows with missing values in target column
+    initial_rows = len(df)
+    if df[target_column].isna().any():
+        missing_target_count = df[target_column].isna().sum()
+        print(f"Dropping {missing_target_count} rows with missing target values.")
+        df = df.dropna(subset=[target_column])
+        print(f"Row reduced: {initial_rows} -> {len(df)} after dropping missing target rows.")
+        
+#Split X and y
+
     X = df.drop(columns=[target_column])
     y = df[target_column]
+
+
     
 
     #Separate numeric and categorical columns
@@ -87,9 +107,12 @@ def preprocess_features(df, target_column):
     if isinstance(X_processed, np.ndarray):
         X_processed = pd.DataFrame(X_processed, columns=feature_names, index=X.index)
     else:
-        X_processed = pd.DataFrame(X_processed.toarray(), columns=feature_names, index=X.index)  # rare case
+        X_processed = pd.DataFrame(X_processed.toarray(), columns=feature_names, index=X.index)
+
+    #Handling missing values for x
+    nan_count = X_processed.isna().sum().sum()
+    if nan_count > 0:
+        print(f"Warning: Found {nan_count} remaining NaN in features after imputation. Filling with 0 (safe for one-hot encoded data)...")
+        X_processed = X_processed.fillna(0)
+    X_processed = X_processed.astype('float64')
     return X_processed, y
-
-
-
-
