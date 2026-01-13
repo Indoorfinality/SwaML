@@ -5,7 +5,7 @@ from src.model_training import train_models
 
 def main():
     #Load dataset
-    df = load_dataset('data/Iris.csv')
+    df = load_dataset('data/traffic_accident_prediction.csv')
     print("Dataset loaded with shape: ", df.shape)
 
     #Detect target column
@@ -18,10 +18,10 @@ def main():
 
     #train models automatically
 
-    best_model_name = train_models(X, y)
+    best_name, best_model, results = train_models(X, y)
 
     print("\n SwaML pipeline finished successfully!")
-    print("Best model selected:", best_model_name)
+    print("Best model selected:", best_name)
 
 if __name__ == "__main__":
     main()
