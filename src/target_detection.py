@@ -29,7 +29,6 @@ def is_text_column(series):
     return False
 
 
-
 def detect_target_candidates(df):
     candidates = []
     for col in df.columns:
