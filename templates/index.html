@@ -16,10 +16,16 @@
     <section class="upload-section">
       <input type="file" id="csvFile" accept=".csv" required />
       <br /><br />
-      <button onclick="startTraining()">Start Training</button>
+      <button onclick="startTraining()">Detect Target & Start Training</button>
     </section>
 
-    <div class="loading" id="loading">Training in progress... Please wait.</div>
+    <div class="loading" id="loading">Processing... Please wait.</div>
+
+    <section
+      id="targetSelection"
+      class="target-selection-section"
+      style="display: none"
+    ></section>
 
     <section id="result" class="result-section"></section>
 

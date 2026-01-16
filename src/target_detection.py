@@ -121,20 +121,35 @@ You are an expert Automatic Machine Learning system.
 
 # ---------------- Main target detection function ---------------- #
 
-def detect_target(df):
+def detect_target(df, confirmed_target=None):
+    """
+    Detect target column from dataframe.
+    
+    Args:
+        df: pandas DataFrame
+        confirmed_target: Optional pre-confirmed target column name
+    
+    Returns:
+        str: Target column name
+    """
+    if confirmed_target:
+        if confirmed_target in df.columns:
+            return confirmed_target
+        else:
+            raise ValueError(f"Target column '{confirmed_target}' not found in dataset")
+    
     candidates = detect_target_candidates(df)
 
     #Gemini LLM suggestion
     target = suggest_target_llm(candidates)
 
-# fallback to heuristic if Gemini fails
+    # fallback to heuristic if Gemini fails
     if target is None:
         target = select_best_target(df, candidates)
     
-    confirm = input(f"Detected target column '{target}'. Confirm? (y/n): ")
-    if confirm.lower() != "y":
-        target = input("Enter target column manually: ")
-
+    if target is None:
+        raise ValueError("Could not detect target column. Please specify manually.")
+    
     return target
 
 # ---------------- Column drop detection ---------------- #

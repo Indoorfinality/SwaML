@@ -96,3 +96,36 @@ a.download-btn {
 a.download-btn:hover {
   background: #219653;
 }
+
+.target-selection-section {
+  margin-top: 20px;
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.target-selection {
+  text-align: left;
+}
+
+.target-selection label {
+  display: block;
+  margin-top: 15px;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.target-selection select {
+  width: 100%;
+  padding: 8px;
+  margin: 10px 0;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+}
+
+.target-selection button {
+  margin-top: 15px;
+}
