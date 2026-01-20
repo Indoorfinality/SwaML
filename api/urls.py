@@ -1,8 +1,11 @@
 from django.urls import path
-from .views import UploadAndTrain, DetectTarget
+from .views import UploadFile, PreviewDataset, AnalyzeTarget, StartTraining
 
 urlpatterns = [
-    path('detect-target/', DetectTarget.as_view(), name='detect-target'),
-    path('upload/', UploadAndTrain.as_view(), name='upload-and-train'),
+    path('upload/', UploadFile.as_view(), name='upload-file'),
+    path('preview/', PreviewDataset.as_view(), name='preview-dataset'),
+    path('analyze-target/', AnalyzeTarget.as_view(), name='analyze-target'),
+    path('start-training/', StartTraining.as_view(), name='start-training'),
+
 ]
 

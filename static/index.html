@@ -9,18 +9,38 @@
   <body>
     <header>
       <h1>SwaML AutoML</h1>
-      <p>Upload your CSV file and get trained ML model automatically</p>
+      <p>Upload CSV → Detect Target → Train Model Automatically</p>
     </header>
 
-    <section class="upload-section">
-      <input type="file" id="csvFile" accept=".csv" required />
-      <br /><br />
-      <button onclick="startTraining()">Start Training</button>
+    <!-- Training Section -->
+    <section class="training-section">
+      <h2>Upload & View Dataset</h2>
+      <div class="upload-box">
+        <input type="file" id="csvFile" accept=".csv" required />
+        <br /><br />
+        <button onclick="startTraining()">Upload Dataset</button>
+      </div>
+
+      <div class="loading" id="loading">Processing... Please wait.</div>
+
+      <!-- Dataset Viewer Section -->
+      <div class="dataset-controls" id="datasetControls" style="display: none">
+        <h3>Display Rows in Dataset</h3>
+        <div class="control-group">
+          <label for="rowLimit">Rows to Show:</label>
+          <input type="number" id="rowLimit" value="10" min="1" />
+        </div>
+
+        <div class="control-group">
+          <label for="offset">Start From Row:</label>
+          <input type="number" id="offset" value="0" min="0" />
+        </div>
+
+        <button onclick="showDataset()">Display Rows</button>
+      </div>
+
+      <section id="result" class="result-section"></section>
     </section>
-
-    <div class="loading" id="loading">Training in progress... Please wait.</div>
-
-    <section id="result" class="result-section"></section>
 
     <script src="{% static 'js/app.js' %}"></script>
   </body>

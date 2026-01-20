@@ -11,7 +11,14 @@ from src.data_utils import load_dataset, preprocess_features
 from src.target_detection import detect_target, detect_target_candidates
 from src.model_training import train_models
 import joblib
-from .serializers import TrainingResultSerializer
+from .serializers import (TrainingResultSerializer,
+                          ErrorResponseSerializer,
+                          UploadFileResponseSerializer,
+                          AnalyzeTargetResponseSerializer, PreviewDataSerializer)
+
+
+UPLOAD_DIR = os.path.join(settings.MEDIA_ROOT, 'uploads')
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def home(request):
@@ -19,22 +26,15 @@ def home(request):
     return render(request, 'index.html')
 
 
-class DetectTarget(APIView):
+
+class UploadFile(APIView):
+    """
+    POST /api/upload-file/
+    Uploads a new CSV file and returns filename + basic preview
+    """
     parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request):
-        """
-        Detect target column from uploaded CSV file.
-        
-        Request:
-            - Method: POST
-            - Content-Type: multipart/form-data
-            - Body: FormData with field 'csv_files' containing the CSV file
-        
-        Response:
-            - Success (200): Returns detected target and all columns
-            - Error (400/500): Returns error message
-        """
         csv_file = request.FILES.get('csv_files')
         if not csv_file:
             return Response({
@@ -43,137 +43,192 @@ class DetectTarget(APIView):
                 "message": "Please provide a CSV file in the 'csv_files' field"
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Save temporarily
-        temp_dir = tempfile.mkdtemp()
-        file_path = os.path.join(temp_dir, f"{uuid.uuid4()}.csv")
+        # Save with unique name
+        filename = f"{uuid.uuid4()}_{csv_file.name}"
+        file_path = os.path.join(UPLOAD_DIR, filename)
 
         with open(file_path, 'wb+') as dest:
             for chunk in csv_file.chunks():
                 dest.write(chunk)
+        try:
+            df = load_dataset(file_path)
+            preview_rows = df.head(10).fillna("N/A").to_dict(orient='records')
 
+            return Response(UploadFileResponseSerializer({
+                "message": "File uploaded successfully",
+                "uploaded_filename": filename,
+                "total_rows": len(df),
+                "columns": list(df.columns),
+            }).data, status=201)
+        except Exception as e:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return Response(ErrorResponseSerializer({
+                "error": "Upload failed",
+                "message": str(e)
+            }).data, status=500)
+
+    
+
+class PreviewDataset(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get(self, request):
+        """
+        Fetch and display rows from an uploaded dataset.
+        
+        Query Parameters:
+            - dataset_name: The filename of the uploaded dataset
+            - limit: Number of rows to return (default: 10)
+            - offset: Starting row index (default: 0)
+        
+        Response:
+            - Success (200): Returns dataset rows with metadata
+            - Error (400/500): Returns error message
+        """
+        dataset_name = request.GET.get('dataset_name')
+        limit = int(request.GET.get('limit', 10))
+        offset = int(request.GET.get('offset', 0))
+
+        if not dataset_name:
+            return Response({
+                "status": "error",
+                "message": "No dataset_name provided"
+            }, status=400)
+
+        file_path = os.path.join(UPLOAD_DIR, dataset_name)
+
+        if not os.path.exists(file_path):
+            return Response({
+                "status": "error",
+                "message": f"Dataset '{dataset_name}' not found"
+            }, status=400)
+
+        try:
+            df = load_dataset(file_path)
+            total_rows = len(df)
+
+            offset = max(0, offset)
+            limit = max(1, limit)
+            limit = min(limit, total_rows - offset)
+            
+            df_slice = df.iloc[offset:offset + limit]
+            data_rows = df_slice.fillna("N/A").to_dict(orient='records')
+
+            return Response(PreviewDataSerializer({
+                "status": "success",
+                "columns": list(df.columns),
+                "total_rows": total_rows,
+                "offset": offset,
+                "limit": limit,
+                "returned_rows": len(data_rows),
+                "data": data_rows
+            }).data, status=200)
+
+        except Exception as e:
+            return Response({
+                "status": "error",
+                "message": str(e)
+            }, status=500)
+
+class AnalyzeTarget(APIView):
+    """
+    POST /api/analyze-target/
+    Analyzes a previously uploaded file and returns target suggestion.
+    
+    Required: uploaded_filename (the filename returned from /api/upload-file/)
+    """
+    parser_classes = (MultiPartParser, FormParser)
+    def post(self, request):
+        uploaded_filename = request.data.get('uploaded_filename')
+        if not uploaded_filename:
+            return Response({
+                "error": "No uploaded_filename provided",
+                "message": "Please provide an uploaded_filename in the 'uploaded_filename' field"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        file_path = os.path.join(UPLOAD_DIR, uploaded_filename)
+        if not os.path.exists(file_path):
+            return Response(ErrorResponseSerializer({
+                "error": "File not found",
+                "message": f"File '{uploaded_filename}' not found"
+            }).data, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
             df = load_dataset(file_path)
             columns = list(df.columns)
             candidates = detect_target_candidates(df)
-            
-            # Detect target without confirmation
             target = detect_target(df)
             
-            os.remove(file_path)
-            os.rmdir(temp_dir)
-
-            return Response({
+            return Response(AnalyzeTargetResponseSerializer({
                 "status": "success",
                 "detected_target": target,
                 "all_columns": columns,
-                "candidate_columns": candidates
-            }, status=status.HTTP_200_OK)
-
+                "candidate_columns": candidates,
+                "uploaded_filename": uploaded_filename
+            }).data, status=status.HTTP_200_OK)
         except Exception as e:
-            # Cleanup temp files
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            if os.path.exists(temp_dir):
-                try:
-                    os.rmdir(temp_dir)
-                except:
-                    pass
-            
-            return Response({
+            return Response(ErrorResponseSerializer({
                 "status": "error",
-                "error": str(e),
-                "message": "An error occurred during target detection. Please check your CSV file format."
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                "error": "Analysis failed",
+                "message": str(e)
+            }).data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-class UploadAndTrain(APIView):
+class StartTraining(APIView):
+    """
+    POST /api/start-training/
+    Starts training using previously uploaded file + target column
+    Required: uploaded_filename, target_column
+    """
     parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request):
-        """
-        Upload CSV file and train ML models automatically.
+        uploaded_filename = request.data.get('uploaded_filename')
+        target = request.data.get('target_column')
         
-        Request:
-            - Method: POST
-            - Content-Type: multipart/form-data
-            - Body: FormData with field 'csv_files' containing the CSV file
+        if not uploaded_filename:
+            return Response(ErrorResponseSerializer({
+                "error": "No uploaded_filename provided",
+                "message": "Please provide an uploaded_filename in the 'uploaded_filename' field"
+            }).data, status=status.HTTP_400_BAD_REQUEST)
         
-        Response:
-            - Success (201): Returns training results with model info
-            - Error (400/500): Returns error message
-        """
-        csv_file = request.FILES.get('csv_files')
-        if not csv_file:
-            return Response({
-                "status": "error",
-                "error": "No CSV file uploaded",
-                "message": "Please provide a CSV file in the 'csv_files' field"
-            }, status=status.HTTP_400_BAD_REQUEST)
+        if not target:
+           return Response(ErrorResponseSerializer({
+               "error": "No target_column provided",
+               "message": "Please provide a target_column in the 'target_column' field"
+           }).data, status=status.HTTP_400_BAD_REQUEST)
         
-        # Save temporarily
-        temp_dir = tempfile.mkdtemp()
-        file_path = os.path.join(temp_dir, f"{uuid.uuid4()}.csv")
-
-        with open(file_path, 'wb+') as dest:
-            for chunk in csv_file.chunks():
-                dest.write(chunk)
-
+        file_path = os.path.join(UPLOAD_DIR, uploaded_filename)
+        if not os.path.exists(file_path):
+            return Response(ErrorResponseSerializer({
+                "error": "File not found",
+                "message": f"File '{uploaded_filename}' not found"
+            }).data, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
             df = load_dataset(file_path)
-            # Get target from request data or detect it
-            target = request.data.get('target_column')
-            if not target:
-                target = detect_target(df)
-            else:
-                # Use confirmed target
-                target = detect_target(df, confirmed_target=target)
-            X,y = preprocess_features(df, target)
+            X, y = preprocess_features(df, target)
             best_name, best_model, results = train_models(X, y)
 
-            #Save model
             model_filename = f"model_{uuid.uuid4()}_{best_name.replace(' ', '_')}.pkl"
-            model_path = os.path.join(settings.MEDIA_ROOT, model_filename)
+            model_path = os.path.join(UPLOAD_DIR, model_filename)
             os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
             joblib.dump(best_model, model_path)
 
-            os.remove(file_path)
-            os.rmdir(temp_dir)
-
-            #Preparing data for serializer
-            response_data = {
+            return Response(TrainingResultSerializer({
                 "status": "success",
                 "best_model": best_name,
                 "results": results,
                 "model_download_url": f"/media/{model_filename}",
-                "feature_plot_url": f"/plots/feature_importance_{best_name.replace(' ', '_')}.png"
-            }
-
-            serializer = TrainingResultSerializer(response_data)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
+                "feature_plot_url": None
+            }).data, status=status.HTTP_200_OK)
         except Exception as e:
-            # Cleanup temp files
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            if os.path.exists(temp_dir):
-                try:
-                    os.rmdir(temp_dir)
-                except:
-                    pass
+            return Response(ErrorResponseSerializer({
+                "error": "Training failed",
+                "message": str(e)
+            }).data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
             
-            # Return consistent error format
-            return Response({
-                "status": "error",
-                "error": str(e),
-                "message": "An error occurred during model training. Please check your CSV file format."
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        
-
-
-
-
-
-    
-
 
